@@ -1,30 +1,23 @@
 import streamlit as st
 import pandas as pd
-from scraper import scrap_glassdoor_reviews
+from scraper import scrape_reviews
 
-st.set_page_config(page_title="Scraper Glassdoor WeFiiT", layout="centered")
-st.title("📊 Scraper les avis WeFiiT sur Glassdoor")
+st.set_page_config(page_title="Scraper Glassdoor WeFiiT", page_icon="📊")
+st.title("📊 Scraper des avis WeFiiT sur Glassdoor (langue FR)")
 
-st.info("1. Charge ton fichier **glassdoor_credentials.txt** (format texte simple, 2 lignes : email, puis mot de passe)\n2. Clique sur 'Lancer le scraping'")
+st.markdown("""
+**Instructions :**
+1. Cliquez sur le bouton **« Lancer le scraping »** pour récupérer les 7 pages d'avis (cela peut prendre ~30 s).
+2. Une fois terminé, un aperçu s'affiche et vous pouvez **télécharger le CSV**.
+""")
 
-uploaded_file = st.file_uploader("Charge ton fichier glassdoor_credentials.txt", type="txt")
-
-if uploaded_file is not None:
-    content = uploaded_file.read().decode().splitlines()
-    if len(content) >= 2:
-        email = content[0].replace("email=", "").strip()
-        password = content[1].replace("password=", "").strip()
-
-        if st.button("Lancer le scraping (7 pages)"):
-            with st.spinner("Scraping en cours..."):
-                avis = scrap_glassdoor_reviews(email, password)
-                if avis:
-                    df = pd.DataFrame(avis)
-                    st.success(f"{len(df)} avis extraits !")
-                    st.dataframe(df)
-                    csv = df.to_csv(index=False).encode()
-                    st.download_button("📥 Télécharger en CSV", csv, "avis_wefiit.csv", "text/csv")
-                else:
-                    st.warning("Aucun avis trouvé.")
+if st.button("Lancer le scraping"):
+    with st.spinner("Scraping en cours …"):
+        df = scrape_reviews()
+    if not df.empty:
+        st.success(f"{len(df)} avis récupérés ✅")
+        st.dataframe(df)
+        csv_bytes = df.to_csv(index=False).encode()
+        st.download_button("📥 Télécharger le CSV", csv_bytes, "avis_wefiit.csv", mime="text/csv")
     else:
-        st.error("Le fichier doit contenir au moins 2 lignes : email, puis mot de passe.")
+        st.warning("Aucun avis trouvé. Essayez plus tard.")

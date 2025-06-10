@@ -1,80 +1,51 @@
-import time
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
+import requests
 from bs4 import BeautifulSoup
+import pandas as pd
+from typing import List, Dict
 
-def scrap_glassdoor_reviews(email, password, nb_pages=7):
-    options = Options()
-    options.add_argument("--headless=new")  # Retire cette ligne pour voir Chrome
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
+BASE_URL = "https://www.glassdoor.fr/Avis/WeFiiT-Avis-E3310403"
+LANG_PARAM = "?filter.iso3Language=fra"
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36"
+}
 
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-    reviews = []
+def _extract_one_review(div) -> Dict[str, str]:
+    """Parse un bloc <div data-test='review-details-container'> et renvoie un dict."""
+    def _safe(sel):
+        el = div.select_one(sel)
+        return el.get_text(strip=True) if el else ""
 
-    urls = [
-        "https://www.glassdoor.fr/Avis/WeFiiT-Avis-E3310403.htm"
-    ] + [
-        f"https://www.glassdoor.fr/Avis/WeFiiT-Avis-E3310403_P{page}.htm?filter.iso3Language=fra"
-        for page in range(2, nb_pages+1)
-    ]
+    # Tags positifs (recommande / PDG / perspective)
+    tags = [span.get_text(strip=True) for span in div.select("div.rating-icon_ratingContainer__9UoJ6 span")]
+    return {
+        "note": _safe("span[data-test='review-rating-label']"),
+        "date": _safe("span.timestamp_reviewDate__dsF9n"),
+        "titre": _safe("h3[data-test='review-details-title']"),
+        "poste": _safe("span[data-test='review-avatar-label']"),
+        "avantages": _safe("span[data-test='review-text-PROS']"),
+        "inconvenients": _safe("span[data-test='review-text-CONS']"),
+        "recommande": "Oui" if any("Recommande" in t for t in tags) else "Non",
+        "approbation_PDG": "Oui" if any("PDG" in t for t in tags) else "Non",
+        "perspective": "Oui" if any("Perspective" in t for t in tags) else "Non"
+    }
 
-    for page_num, url in enumerate(urls, 1):
-        driver.get(url)
-        time.sleep(2)
 
-        # Accepter cookies si popup
-        try:
-            btn = driver.find_element(By.XPATH, "//button[contains(text(),'Accepter')]")
-            btn.click()
-            time.sleep(1)
-        except Exception:
-            pass
+def scrape_reviews(nb_pages: int = 7) -> pd.DataFrame:
+    """Scrape les avis Glassdoor WeFiiT (langue FR) sans Selenium."""
+    reviews: List[Dict[str, str]] = []
+    for page in range(1, nb_pages + 1):
+        if page == 1:
+            url = BASE_URL + ".htm"
+        else:
+            url = f"{BASE_URL}_P{page}.htm{LANG_PARAM}"
+        print(f"Téléchargement {url}")
+        resp = requests.get(url, headers=HEADERS, timeout=20)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "html.parser")
+        for div in soup.select("div[data-test='review-details-container']"):
+            reviews.append(_extract_one_review(div))
+    return pd.DataFrame(reviews)
 
-        soup = BeautifulSoup(driver.page_source, "html.parser")
-        avis_html = soup.find_all("div", attrs={"data-test": "review-details-container"})
-
-        for avis in avis_html:
-            try:
-                titre = avis.select_one("[data-test='review-details-title']").get_text(strip=True)
-            except: titre = ""
-            try:
-                note = avis.select_one("[data-test='review-rating-label']").get_text(strip=True)
-            except: note = ""
-            try:
-                date = avis.select_one("span.timestamp_reviewDate__dsF9n").get_text(strip=True)
-            except: date = ""
-            try:
-                poste = avis.select_one("span.review-avatar_avatarLabel__P15ey").get_text(strip=True)
-            except: poste = ""
-            try:
-                localisation = ""
-                tags = avis.select("div.review-avatar_tagsContainer__9NCNs div.text-with-icon_LabelContainer__xbtB8")
-                if tags:
-                    localisation = tags[-1].get_text(strip=True)
-            except: localisation = ""
-            try:
-                recommande = "Oui" if avis.select_one("div.rating-icon_positiveStyles__LGHYG span") and "Recommande" in avis.select_one("div.rating-icon_positiveStyles__LGHYG span").get_text() else "Non"
-            except: recommande = ""
-            try:
-                avantages = avis.select_one("span[data-test='review-text-PROS']").get_text(strip=True)
-            except: avantages = ""
-            try:
-                inconvenients = avis.select_one("span[data-test='review-text-CONS']").get_text(strip=True)
-            except: inconvenients = ""
-            reviews.append({
-                "titre": titre,
-                "note": note,
-                "date": date,
-                "poste": poste,
-                "localisation": localisation,
-                "recommande": recommande,
-                "avantages": avantages,
-                "inconvenients": inconvenients
-            })
-
-    driver.quit()
-    return reviews
+if __name__ == "__main__":
+    df = scrape_reviews()
+    print(df.head())
