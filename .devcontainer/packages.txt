@@ -1,2 +1,2 @@
-chromium          # le navigateur
-chromium-driver   # (facultatif) le driver assorti ; utile si vous voulez vous passer de webdriver-manager
+chromium
+chromium-driver
