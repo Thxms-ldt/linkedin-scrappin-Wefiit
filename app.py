@@ -32,8 +32,6 @@ col1, col2 = st.columns([2, 1])
 
 with col1:
     st.subheader("Données scrapées")
-    
-    # Zone pour afficher les résultats
     results_container = st.container()
 
 with col2:
@@ -70,8 +68,11 @@ if st.session_state.get('start_scraping', False):
                     st.metric("Total Reviews", len(df))
                 with col_metrics2:
                     if 'rating' in df.columns:
-                        avg_rating = df['rating'].str.extract(r'(\d+\.?\d*)').astype(float).mean()
-                        st.metric("Note Moyenne", f"{avg_rating:.1f}/5")
+                        try:
+                            avg_rating = df['rating'].str.extract(r'(\d+\.?\d*)').astype(float).mean()
+                            st.metric("Note Moyenne", f"{avg_rating:.1f}/5")
+                        except:
+                            st.metric("Note Moyenne", "N/A")
                 with col_metrics3:
                     st.metric("Colonnes", len(df.columns))
                 
@@ -93,14 +94,17 @@ if st.session_state.get('start_scraping', False):
                     )
                 
                 with col_dl2:
-                    excel_buffer = pd.io.common.BytesIO()
-                    df.to_excel(excel_buffer, index=False)
-                    st.download_button(
-                        label="📥 Télécharger Excel",
-                        data=excel_buffer.getvalue(),
-                        file_name=f"glassdoor_reviews_{time.strftime('%Y%m%d_%H%M%S')}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
+                    try:
+                        excel_buffer = pd.io.common.BytesIO()
+                        df.to_excel(excel_buffer, index=False)
+                        st.download_button(
+                            label="📥 Télécharger Excel",
+                            data=excel_buffer.getvalue(),
+                            file_name=f"glassdoor_reviews_{time.strftime('%Y%m%d_%H%M%S')}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        )
+                    except ImportError:
+                        st.warning("Excel export non disponible. Utilisez CSV.")
                 
             else:
                 st.error("❌ Aucune donnée récupérée. Vérifiez les logs ci-dessus.")
@@ -169,4 +173,4 @@ with st.expander("ℹ️ Informations et limitations"):
 
 # Footer
 st.markdown("---")
-st.markdown("💡 **Tip**: Si le scraping échoue, essayez la méthode Selenium ou réduisez le nombre de pages.
+st.markdown("💡 **Tip**: Si le scraping échoue, essayez la méthode Selenium ou réduisez le nombre de pages.")
