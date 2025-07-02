@@ -138,7 +138,7 @@ def fermer_popups_linkedin(page):
 def run_scraper(inviter=False):
     donnees = []
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
+        browser = p.chromium.launch(headless=True)
         context = browser.new_context()
         context.add_cookies([{
             'name': 'li_at',
