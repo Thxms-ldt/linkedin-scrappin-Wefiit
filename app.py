@@ -6,6 +6,9 @@ import csv
 import os
 from datetime import datetime
 from playwright.sync_api import sync_playwright
+import subprocess
+subprocess.run(["playwright", "install", "--with-deps"])
+
 
 # ---- Liste complète des écoles avec IDs LinkedIn ----
 ECOLES = {
